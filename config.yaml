@@ -1,0 +1,24 @@
+# 3D Reconstruction Pipeline Configuration
+
+paths:
+  bin_dir: "bin"
+  config_dir: "config"
+  output_dir: "output"
+  sequence_dir: "test_data/sequence" # default sequence directory (overridden by command line)
+
+logging:
+  level: "INFO"
+  file: "logs/reconstruction.log"
+  enable_file: true # file logging
+  enable_console: true
+  console_level: "WARNING"
+
+processing:
+  show_progress: true # progress bar
+  show_timing: true # detailed timing
+  cleanup_intermediate: true # intermediate files generated during processing
+  retry_attempts: 1 # for failed steps
+
+system:
+  step_timeout: 300 # for individual processing steps in seconds
+  use_xvfb: true # on Linux for headless execution

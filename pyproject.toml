@@ -15,7 +15,7 @@ dependencies = [
 # Optional dependencies for advanced image processing and development for reconstruction
 full = [
     "opencv-python>=4.5.0",
-    "open3d>=0.15.0"
+    "open3d>=0.15.0",
     "Pillow>=8.0.0",
     "scipy>=1.7.0",
     "matplotlib>=3.3.0",

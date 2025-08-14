@@ -186,13 +186,6 @@ Files are named using frame numbers from input images (e.g., `STEREO_1*_005.bmp`
 - No impact on other frames in the sequence
 - Clear reporting of what succeeded/failed
 
-### Debug Mode
-
-Enable verbose logging for troubleshooting:
-```bash
-python reconstruct.py --frame 0 --verbose
-```
-
 ## Future Enhancements
 
 1. **GPU Acceleration** Potential CUDA/OpenCL support for compute-intensive stages

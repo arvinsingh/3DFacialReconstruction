@@ -5,6 +5,8 @@ Main reconstruction pipeline orchestrator.
 from pathlib import Path
 from typing import Dict, List, Tuple
 import time
+import tempfile
+import shutil
 
 from config import ConfigManager
 from file_utils import FileManager
@@ -85,11 +87,32 @@ class ReconstructionPipeline:
         
         self.logger.info(f"Output directory: {output_dir}")
         
+        # Create temporary directory for format conversion if needed
+        temp_dir = None
+        converted_images = images
+        
+        try:
+            needs_conversion = any(img_path.suffix.lower() in ['.png', '.jpg', '.jpeg'] 
+                                 for img_path in images.values())
+            
+            if needs_conversion:
+                temp_dir = Path(tempfile.mkdtemp(prefix="reconstruction_", suffix="_temp"))
+                self.logger.info("Converting images to BMP format for compatibility...")
+                converted_images = self.file_manager.convert_images_to_bmp(images, temp_dir, self.logger)
+                self.logger.debug(f"Temporary conversion directory: {temp_dir}")
+        
+        except Exception as e:
+            if temp_dir and temp_dir.exists():
+                shutil.rmtree(temp_dir)
+            self.logger.error(f"Image format conversion failed: {e}")
+            self.logger.add_failed_frame(frame_num, f"Image conversion failed: {e}", "image conversion")
+            return False
+        
         total_start = time.time()
         
         try:
             self.logger.info("Step 1: Stereo Processing")
-            success = self._run_stereo_step(images, calibs, output_dir, frame_num)
+            success = self._run_stereo_step(converted_images, calibs, output_dir, frame_num)
             if not success:
                 self.logger.add_failed_frame(frame_num, "Stereo processing failed", "stereo processing")
                 return False
@@ -107,7 +130,7 @@ class ReconstructionPipeline:
                 return False
             
             self.logger.info("Step 4: Add Texture")
-            success = self._run_texture_step(images, calibs, output_dir, frame_num)
+            success = self._run_texture_step(converted_images, calibs, output_dir, frame_num)
             if not success:
                 self.logger.add_failed_frame(frame_num, "Texture mapping failed", "texture mapping")
                 return False
@@ -115,6 +138,10 @@ class ReconstructionPipeline:
         except Exception as e:
             self.logger.add_failed_frame(frame_num, f"Pipeline error: {str(e)}", "pipeline")
             self._cleanup_failed_frame(output_dir, frame_num)
+            # Clean up temporary directory if it was created
+            if temp_dir and temp_dir.exists():
+                shutil.rmtree(temp_dir)
+                self.logger.debug(f"Cleaned up temporary directory: {temp_dir}")
             return False
         
         try:
@@ -138,7 +165,14 @@ class ReconstructionPipeline:
         except Exception as e:
             self.logger.add_failed_frame(frame_num, f"Final processing error: {str(e)}", "final processing")
             self._cleanup_failed_frame(output_dir, frame_num)
+            if temp_dir and temp_dir.exists():
+                shutil.rmtree(temp_dir)
+                self.logger.debug(f"Cleaned up temporary directory: {temp_dir}")
             return False
+        
+        if temp_dir and temp_dir.exists():
+            shutil.rmtree(temp_dir)
+            self.logger.debug(f"Cleaned up temporary directory: {temp_dir}")
         
         # Summary
         total_duration = time.time() - total_start

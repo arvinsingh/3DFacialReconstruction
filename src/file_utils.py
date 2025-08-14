@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Dict, List, Set
 import re
 
+try:
+    from PIL import Image
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
+
 
 class FileManager:
     """Manages file discovery and validation for reconstruction pipeline"""
@@ -45,10 +51,10 @@ class FileManager:
         try:
             # Supported naming patterns (case-insensitive)
             patterns = [
-                r'(STEREO|stereo)_(\d+[A-Za-z])_(\d{3,4})\.(bmp|png|jpg|jpeg)',
-                r'(TEXTURE|texture)_(\d+[A-Za-z])_(\d{3,4})\.(bmp|png|jpg|jpeg)',
-                r'(\d+[A-Za-z])_(\d{3,4})\.(bmp|png|jpg|jpeg)',
-                r'(cam|CAM)(\d+[A-Za-z])_(\d{3,4})\.(bmp|png|jpg|jpeg)',
+                r'(STEREO|stereo)_(\d+[A-Za-z])_(\d{3,5})\.(bmp|png|jpg|jpeg)',
+                r'(TEXTURE|texture)_(\d+[A-Za-z])_(\d{3,5})\.(bmp|png|jpg|jpeg)',
+                r'(\d+[A-Za-z])_(\d{3,5})\.(bmp|png|jpg|jpeg)',
+                r'(cam|CAM)(\d+[A-Za-z])_(\d{3,5})\.(bmp|png|jpg|jpeg)',
             ]
             
             for file_path in image_dir.glob("*"):
@@ -175,9 +181,9 @@ class FileManager:
         frames = set()
         
         patterns = [
-            r'(?:STEREO|stereo|TEXTURE|texture)_\d+[A-Za-z]_(\d{3,4})\.(bmp|png|jpg|jpeg)',
-            r'\d+[A-Za-z]_(\d{3,4})\.(bmp|png|jpg|jpeg)',
-            r'(?:cam|CAM)\d+[A-Za-z]_(\d{3,4})\.(bmp|png|jpg|jpeg)',
+            r'(?:STEREO|stereo|TEXTURE|texture)_\d+[A-Za-z]_(\d{3,5})\.(bmp|png|jpg|jpeg)',
+            r'\d+[A-Za-z]_(\d{3,5})\.(bmp|png|jpg|jpeg)',
+            r'(?:cam|CAM)\d+[A-Za-z]_(\d{3,5})\.(bmp|png|jpg|jpeg)',
         ]
         
         for file_path in image_dir.glob("*"):
@@ -216,3 +222,60 @@ class FileManager:
             'path': str(file_path),
             'extension': file_path.suffix.lower()
         }
+    
+    def convert_images_to_bmp(self, images: Dict[str, Path], temp_dir: Path, logger=None) -> Dict[str, Path]:
+        """
+        Convert non-BMP image files to BMP format for compatibility with stereo_processor.exe.
+        
+        Args:
+            images: Dictionary mapping camera IDs to image file paths
+            temp_dir: Temporary directory for converted files
+            logger: Optional logger instance for logging conversion progress
+            
+        Returns:
+            Dictionary mapping camera IDs to BMP file paths (converted or original)
+            
+        Raises:
+            Exception: If conversion fails or PIL is not available
+        """
+        if not PILLOW_AVAILABLE:
+            raise Exception("PIL/Pillow is required for image format conversion but is not installed")
+        
+        converted_images = {}
+        
+        for camera_id, image_path in images.items():
+            file_ext = image_path.suffix.lower()
+            
+            if file_ext == '.bmp':
+                converted_images[camera_id] = image_path
+                if logger:
+                    logger.debug(f"Camera {camera_id}: Using original BMP file")
+            elif file_ext in ['.png', '.jpg', '.jpeg']:
+                bmp_filename = f"{camera_id}_{image_path.stem}.bmp"
+                bmp_path = temp_dir / bmp_filename
+                
+                try:
+                    with Image.open(image_path) as img:
+                        if img.mode in ['RGBA', 'LA']:
+                            # Convert transparency to white background
+                            background = Image.new('RGB', img.size, (255, 255, 255))
+                            if img.mode == 'RGBA':
+                                background.paste(img, mask=img.split()[-1])  # Use alpha channel as mask
+                            else:
+                                background.paste(img, mask=img.split()[-1])
+                            img = background
+                        elif img.mode not in ['RGB', 'L']:
+                            img = img.convert('RGB')
+                        
+                        img.save(bmp_path, 'BMP')
+                        
+                        converted_images[camera_id] = bmp_path
+                        if logger:
+                            logger.info(f"Camera {camera_id}: Converted {file_ext} to BMP -> {bmp_filename}")
+                        
+                except Exception as e:
+                    raise Exception(f"Failed to convert {image_path} to BMP: {e}")
+            else:
+                raise Exception(f"Unsupported image format: {file_ext} for file {image_path}")
+        
+        return converted_images

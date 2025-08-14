@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import time
 import os
+import tempfile
+import shutil
 import concurrent.futures
 import threading
 from queue import Queue, Empty
@@ -38,6 +40,7 @@ class FrameTask:
     images: Dict[str, Path] = None
     calibs: Dict[str, Path] = None
     stage: ProcessingStage = ProcessingStage.STEREO
+    temp_dir: Path = None  # temp dir for converted img
     
 
 @dataclass
@@ -186,7 +189,28 @@ class ParallelReconstructionPipeline:
                     skip_reason = "Missing files - " + "; ".join(missing_items)
                     return {'frame_num': frame_num, 'status': 'failed', 'reason': skip_reason, 'stage': 'validation'}
                 
-                return {'frame_num': frame_num, 'status': 'success', 'task': FrameTask(frame_num, image_dir, calib_dir, output_dir, images, calibs)}
+                # check if imgs need conversion to BMP format
+                converted_images = images
+                temp_dir = None
+                
+                needs_conversion = any(img_path.suffix.lower() in ['.png', '.jpg', '.jpeg'] 
+                                     for img_path in images.values())
+                
+                if needs_conversion:
+                    temp_dir = Path(tempfile.mkdtemp(prefix=f"reconstruction_frame_{frame_num}_", suffix="_temp"))
+                    try:
+                        converted_images = self.file_manager.convert_images_to_bmp(images, temp_dir, self.logger)
+                        self.logger.debug(f"Frame {frame_num}: Converted images to BMP format")
+                    except Exception as e:
+                        if temp_dir and temp_dir.exists():
+                            shutil.rmtree(temp_dir)
+                        return {'frame_num': frame_num, 'status': 'failed', 'reason': f"Image conversion failed: {e}", 'stage': 'conversion'}
+                
+                # create task with converted images and temp directory info
+                task = FrameTask(frame_num, image_dir, calib_dir, output_dir, converted_images, calibs)
+                task.temp_dir = temp_dir  # save ref for cleanup
+                
+                return {'frame_num': frame_num, 'status': 'success', 'task': task}
             except Exception as e:
                 return {'frame_num': frame_num, 'status': 'failed', 'reason': str(e), 'stage': 'preparation'}
         
@@ -361,12 +385,22 @@ class ParallelReconstructionPipeline:
                 return {'success': False, 'error': 'Final output verification failed', 'failed_stage': 'verification'}
             
             self.logger.info(f"Worker {worker_id}: Frame {frame_num:03d} completed successfully")
+            
+            if task.temp_dir and task.temp_dir.exists():
+                shutil.rmtree(task.temp_dir)
+                self.logger.debug(f"Worker {worker_id}: Cleaned up temporary directory for frame {frame_num:03d}")
+            
             return {'success': True}
             
         except Exception as e:
             error_msg = f"Frame {frame_num:03d} failed: {e}"
             self.logger.error(f"Worker {worker_id}: {error_msg}")
             self._cleanup_failed_frame(task.output_dir, frame_num)
+            
+            if task.temp_dir and task.temp_dir.exists():
+                shutil.rmtree(task.temp_dir)
+                self.logger.debug(f"Worker {worker_id}: Cleaned up temporary directory for frame {frame_num:03d}")
+            
             return {'success': False, 'error': error_msg, 'failed_stage': 'exception'}
     
     def _pipeline_worker(self, stage: ProcessingStage, stage_queues: Dict, 

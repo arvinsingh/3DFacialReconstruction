@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=1.20.0",
     "PyYAML>=6.0.2",
     "tqdm>=4.67.1",
+    "Pillow>=8.0.0",
 ]
 
 [project.optional-dependencies]

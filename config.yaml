@@ -11,13 +11,17 @@ logging:
   file: "logs/reconstruction.log"
   enable_file: true # file logging
   enable_console: true
-  console_level: "WARNING"
+  console_level: "CRITICAL"
 
 processing:
   show_progress: true # progress bar
   show_timing: true # detailed timing
   cleanup_intermediate: true # intermediate files generated during processing
-  retry_attempts: 1 # for failed steps
+  retry_attempts: 3 # for failed steps
+  # parallel processing settings
+  enable_parallel: true # enable multithreading by default
+  max_workers: null # max worker threads (null = auto-detect)
+  parallel_mode: "frame_parallel" # "frame_parallel" or "pipeline_parallel"
 
 system:
   step_timeout: 300 # for individual processing steps in seconds

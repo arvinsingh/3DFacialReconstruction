@@ -12,6 +12,7 @@ import logging
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from pipeline import ReconstructionPipeline
+from parallel_pipeline import ParallelReconstructionPipeline
 from config import ConfigManager
 from file_utils import FileManager
 from executor import CrossPlatformExecutor
@@ -52,6 +53,16 @@ def main():
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose output (override config)')
     
+    parser.add_argument('--parallel', '-p', action='store_true',
+                       help='Enable parallel processing (multithreading)')
+    
+    parser.add_argument('--workers', '-w', type=int, default=None,
+                       help='Number of worker threads (default: CPU count + 4)')
+    
+    parser.add_argument('--mode', '-m', choices=['frame_parallel', 'pipeline_parallel'],
+                       default='frame_parallel',
+                       help='Parallel processing mode: frame_parallel (process multiple frames simultaneously) or pipeline_parallel (overlap processing stages)')
+    
     args = parser.parse_args()
     
     # validate
@@ -66,7 +77,10 @@ def main():
         sys.exit(1)
     
     try:
-        pipeline = ReconstructionPipeline(args.base_dir, args.config)
+        if args.parallel:
+            pipeline = ParallelReconstructionPipeline(args.base_dir, args.config, args.workers)
+        else:
+            pipeline = ReconstructionPipeline(args.base_dir, args.config)
         
         if args.verbose:
             pipeline.logger.logger.handlers[1].setLevel(logging.INFO)
@@ -121,13 +135,23 @@ def main():
         start_frame = end_frame = 0
     
     try:
-        results = pipeline.process_frame_range(
-            sequence_dir,
-            sequence_dir,
-            output_dir,
-            start_frame,
-            end_frame
-        )
+        if args.parallel:
+            results = pipeline.process_frame_range_parallel(
+                sequence_dir,
+                sequence_dir,
+                output_dir,
+                start_frame,
+                end_frame,
+                args.mode
+            )
+        else:
+            results = pipeline.process_frame_range(
+                sequence_dir,
+                sequence_dir,
+                output_dir,
+                start_frame,
+                end_frame
+            )
         
         successful = sum(results.values())
         total = len(results)

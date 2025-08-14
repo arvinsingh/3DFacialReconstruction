@@ -6,8 +6,9 @@ A modular Python package that processes stereo imaging data to create textured 3
 
 from .config import ConfigManager
 from .file_utils import FileManager
-from .executor import WineExecutor
+from .executor import CrossPlatformExecutor
 from .pipeline import ReconstructionPipeline
+from .parallel_pipeline import ParallelReconstructionPipeline
 
-__version__ = "1.0.0"
-__all__ = ["ConfigManager", "FileManager", "WineExecutor", "ReconstructionPipeline"]
+__version__ = "1.1.0"
+__all__ = ["ConfigManager", "FileManager", "CrossPlatformExecutor", "ReconstructionPipeline", "ParallelReconstructionPipeline"]

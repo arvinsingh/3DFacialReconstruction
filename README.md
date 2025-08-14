@@ -28,12 +28,25 @@ python reconstruct.py --frame 0
 # Process frame range  
 python reconstruct.py --frame-range 0 5
 
-# Process with custom directories
-python reconstruct.py --sequence-dir test_data/sequence --output-dir results --frame-range 0 2
+# Process entire sequence with multithraeding
+python reconstruct.py --sequence --parallel
+
+# Process with custom directories and parallel processing
+python reconstruct.py --sequence-dir test_data/sequence --output-dir results --frame-range 0 10 --parallel --workers 6
 
 # Show system information
 python reconstruct.py --info
+
+# Verbose outpt (for debugging)
+python reconstruct.py --frame 0 --verbose
+
+# Custom configuration
+python reconstruct.py --frame 0 --config custom_config.yaml
 ```
+
+## Performance mode
+
+See [multithreading.md](multithreading.md) for more detials.
 
 ## Installation
 
@@ -57,9 +70,7 @@ sudo apt install wine  # Ubuntu/Debian
 
 The system uses `config.yaml` for all configuration.
 
-## Usage
-
-### Command Line Options
+## Command Line Options
 
 ```
 positional arguments:
@@ -74,22 +85,9 @@ optional arguments:
   --verbose                  Enable verbose console output
   --info                     Show system information
   --help                     Show help message
-```
-
-### Processing Examples
-
-```bash
-# Single frame processing
-python reconstruct.py --frame 0 --sequence-dir data/sequence1 --output-dir results
-
-# Batch processing
-python reconstruct.py --frame-range 0 10 --sequence-dir data/sequence1
-
-# Verbose output (for debugging)
-python reconstruct.py --frame 0 --verbose
-
-# Custom configuration
-python reconstruct.py --frame 0 --config custom_config.yaml
+  --parallel                 Enable parallel processing
+  --mode MODE                Parallel processing mode (frame or pipeline)
+  --workers N                Number of workers for parallel processing
 ```
 
 ## Input Data Structure
@@ -195,8 +193,15 @@ Enable verbose logging for troubleshooting:
 python reconstruct.py --frame 0 --verbose
 ```
 
+## Future Enhancements
+
+1. **GPU Acceleration** Potential CUDA/OpenCL support for compute-intensive stages
+2. **Distributed Processing** Network-based processing across multiple machines
+3. **Adaptive Threading** Dynamic worker adjustment based on system load
+4. **Memory Optimization** Streaming processing for very large sequences
+
 ## Acknowledgments
 
 We gratefully acknowledge the participants who volunteered for the 3D facial data collection, whose contributions were essential to the success of this project.
 
-The complete dataset used in the project is available at [Zenodo](https://doi.org/10.5281/zenodo.15397513).
+Complete dataset used in the project is available at [Zenodo](https://doi.org/10.5281/zenodo.15397513).
